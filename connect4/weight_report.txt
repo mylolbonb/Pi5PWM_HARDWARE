@@ -1,0 +1,6 @@
+frame_half_x2    solid   32.6 cm3   ~ 40.4 g each  x2  =   80.8 g
+side_clamp_x2    solid    3.2 cm3   ~  4.0 g each  x2  =    8.0 g
+foot_x2          solid   16.0 cm3   ~ 14.2 g each  x2  =   28.4 g
+release_bar_x1   solid    7.4 cm3   ~  6.1 g each  x1  =    6.1 g
+disc_x42         solid    1.9 cm3   ~  1.6 g each  x42 =   67.9 g
+TOTAL ~191 g  (shell 0.75 mm, infill 15%)

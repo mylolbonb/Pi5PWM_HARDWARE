@@ -1,10 +1,10 @@
 interferences: 0
 min disc-to-frame gap (all 42 discs): 0.750 mm
-disc vs channel: width 2.00 mm total, depth 1.50 mm total
-disc vs window edge overlap (retention) per side: 2.00 mm
+disc vs channel: width 3.00 mm total, depth 1.50 mm total
+disc overlaps window edge (retention): 2.50 mm top+bottom
 bar-to-frame gap: 0.000 mm
 bar pulled-out path vs right foot: 0.000 0.000 mm^3 (0 = clear)
 bar path vs right clamp: 0.000
-peg fit: peg 4.0 in hole 4.2 -> 0.10000000000000009 mm per side
+peg fit: peg 3.5 in hole 3.7 -> 0.10000000000000009 mm per side
 clamp L to frame gap: 0.000 mm  (snap bumps sit in grooves)
 frame-in-foot pocket clearance per side: 0.15 mm

@@ -39,7 +39,7 @@ frame = A["front"].union(A["back"])
 md = min(dist(discs[k], frame) for k in discs)
 print(f"min disc-to-frame gap (all 42 discs): {md:.3f} mm")
 print(f"disc vs channel: width {c4.CHAN_W - c4.DISC_D:.2f} mm total, depth {c4.CHAN_D - c4.DISC_T:.2f} mm total")
-print(f"disc vs window edge overlap (retention) per side: {(c4.DISC_D - c4.WINDOW_D) / 2:.2f} mm")
+print(f"disc overlaps window edge (retention): {(c4.DISC_D - c4.WIN_H) / 2:.2f} mm top+bottom")
 print(f"bar-to-frame gap: {dist(A['bar'], frame):.3f} mm")
 # bar can be pulled fully out to the right without hitting the right foot
 pulled = A["bar"].translate((c4.BAR_L + 5, 0, 0))

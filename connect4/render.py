@@ -80,6 +80,26 @@ render(base + discs + loose, "01_assembled_front.png", (-180, -620, 420), c, zoo
 render(base + discs, "02_assembled_back.png", (480, 640, 300), c, zoom=1.2, title="Back view")
 render(base + discs, "03_front_straight.png", (125, -900, 130), c, zoom=1.25, title="Front - 250 mm wide x 237 mm tall")
 
+# release-bar operation sequence (right-hand side, bar pulls out to the right)
+def bar_at(pull):
+    return actor(A["bar"].translate((pull, 0, 0)), (0.95, 0.45, 0.10))
+frame_only = [actor(A["front"], FRAME_COL), actor(A["back"], FRAME_COL),
+              actor(A["footL"], GREY), actor(A["footR"], GREY)]
+full = [(i, j, (i + j) % 2) for i in range(7) for j in range(3)]
+stack = [disc_in_board(*m) for m in full]
+render(frame_only + [bar_at(0)] + stack, "08_bar_closeup_in.png", (420, -260, 160), (238, 6, 45),
+       zoom=1.0, reset=False, title="Release bar IN (orange) - grip sits in notch of foot")
+render(frame_only + [bar_at(120)] + stack, "09_bar_half_out.png", (520, -420, 260), (250, 6, 60),
+       zoom=1.0, reset=False, title="Pull the grip to the right - bar slides out through the notch")
+dropped = []
+for i in range(7):
+    for k in range(3):
+        x = c4.col_x(i); y = c4.FRAME_T / 2 - 3 + (k - 1) * 0.1
+        d = disc.rotate((0, 0, 0), (1, 0, 0), -90).translate((x - 3 + 3 * k, -40 - 8 * k, 0))
+        dropped.append(actor(disc.translate((x, -40 - 33 * k, 0)), RED if (i + k) % 2 else YEL))
+render(frame_only + [bar_at(240)] + dropped, "10_bar_out_discs_dropped.png", (-120, -700, 380), (180, 6, 90),
+       zoom=1.0, title="Bar fully out - all discs drop out the bottom. Slide it back in to play again")
+
 # exploded view
 ex = [actor(A["front"].translate((0, -120, 0)), FRAME_COL), actor(A["back"].translate((0, 120, 0)), FRAME_COL),
       actor(A["bar"].translate((90, 0, 0)), GREY), actor(A["footL"].translate((-70, 0, -30)), GREY),

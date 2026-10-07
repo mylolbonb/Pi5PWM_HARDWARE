@@ -124,6 +124,12 @@ def foot():
     end = (cq.Workplane("XY").box(4, pocket_t + 2 * CHEEK_T, cheek_h, centered=False)
            .translate((x_out, -(pocket_t / 2 + CHEEK_T), 0)))
     f = f.union(end)
+    # open-top notch in the end wall so the release bar + grip can slide out
+    nw = CHAN_D + 1.0
+    z0 = LIFT + BAR_Z0 - 1.0
+    notch = (cq.Workplane("XY").box(30, nw, cheek_h, centered=False)
+             .translate((x_out - 5, -nw / 2, z0)))
+    f = f.cut(notch)
     return f
 
 # ---------------- disc (print 21 + 21) ----------------

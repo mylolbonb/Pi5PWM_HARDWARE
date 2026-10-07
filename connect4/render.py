@@ -57,73 +57,74 @@ def render(actors, name, cam_pos, focal, up=(0, 0, 1), size=(1600, 1200), zoom=1
     print("wrote", name)
 
 os.makedirs(OUT, exist_ok=True)
+for f in os.listdir(OUT):
+    os.remove(os.path.join(OUT, f))
 A = c4.assembly()
 disc = c4.disc()
+CLAMP_COL = (0.95, 0.95, 0.97)
+BAR_COL = (0.95, 0.45, 0.10)
 
 def disc_in_board(i, j, red):
-    x = c4.col_x(i); z = c4.LIFT + c4.row_z(j); y = c4.PLATE_T + (c4.CHAN_D - c4.DISC_T) / 2
-    d = disc.rotate((0, 0, 0), (1, 0, 0), -90).translate((x, y, z))
-    return actor(d, RED if red else YEL)
+    return actor(c4.disc_at(i, j, disc), RED if red else YEL)
 
-# a little game in progress: (col, row, red?)
+frame_parts = [actor(A["front"], FRAME_COL), actor(A["back"], FRAME_COL),
+               actor(A["clampL"], CLAMP_COL), actor(A["clampR"], CLAMP_COL),
+               actor(A["footL"], GREY), actor(A["footR"], GREY)]
 moves = [(3,0,1),(3,1,0),(2,0,1),(4,0,0),(4,1,1),(5,0,0),(1,0,1),(3,2,0),(2,1,1),(5,1,0),(2,2,1),(6,0,0)]
-base = [actor(A["front"], FRAME_COL), actor(A["back"], FRAME_COL), actor(A["bar"], GREY),
-        actor(A["footL"], GREY), actor(A["footR"], GREY)]
 discs = [disc_in_board(*m) for m in moves]
-loose = []
-for k in range(4):
-    d = disc.translate((40 + k * 36, -95, 0)); loose.append(actor(d, RED if k % 2 else YEL))
+loose = [actor(disc.translate((40 + k * 36, -95, 0)), RED if k % 2 else YEL) for k in range(4)]
+bar_in = actor(A["bar"], BAR_COL)
+c = (125, 6, 125)
+render(frame_parts + [bar_in] + discs + loose, "01_assembled_front.png", (-180, -620, 420), c, zoom=1.15,
+       title="Connect 4 - assembled (white = side clamps, orange = release bar)")
+render(frame_parts + [bar_in] + discs, "02_assembled_back.png", (480, 640, 300), c, zoom=1.2, title="Back view")
 
-c = (125, 6, 130)
-render(base + discs + loose, "01_assembled_front.png", (-180, -620, 420), c, zoom=1.15,
-       title="Connect 4 - assembled (game in progress)")
-render(base + discs, "02_assembled_back.png", (480, 640, 300), c, zoom=1.2, title="Back view")
-render(base + discs, "03_front_straight.png", (125, -900, 130), c, zoom=1.25, title="Front - 250 mm wide x 237 mm tall")
-
-# release-bar operation sequence (right-hand side, bar pulls out to the right)
-def bar_at(pull):
-    return actor(A["bar"].translate((pull, 0, 0)), (0.95, 0.45, 0.10))
-frame_only = [actor(A["front"], FRAME_COL), actor(A["back"], FRAME_COL),
-              actor(A["footL"], GREY), actor(A["footR"], GREY)]
-full = [(i, j, (i + j) % 2) for i in range(7) for j in range(3)]
-stack = [disc_in_board(*m) for m in full]
-render(frame_only + [bar_at(0)] + stack, "08_bar_closeup_in.png", (420, -260, 160), (238, 6, 45),
-       zoom=1.0, reset=False, title="Release bar IN (orange) - grip sits in notch of foot")
-render(frame_only + [bar_at(120)] + stack, "09_bar_half_out.png", (520, -420, 260), (250, 6, 60),
-       zoom=1.0, reset=False, title="Pull the grip to the right - bar slides out through the notch")
-dropped = []
-for i in range(7):
-    for k in range(3):
-        x = c4.col_x(i); y = c4.FRAME_T / 2 - 3 + (k - 1) * 0.1
-        d = disc.rotate((0, 0, 0), (1, 0, 0), -90).translate((x - 3 + 3 * k, -40 - 8 * k, 0))
-        dropped.append(actor(disc.translate((x, -40 - 33 * k, 0)), RED if (i + k) % 2 else YEL))
-render(frame_only + [bar_at(240)] + dropped, "10_bar_out_discs_dropped.png", (-120, -700, 380), (180, 6, 90),
-       zoom=1.0, title="Bar fully out - all discs drop out the bottom. Slide it back in to play again")
-
-# exploded view
+# exploded
 ex = [actor(A["front"].translate((0, -120, 0)), FRAME_COL), actor(A["back"].translate((0, 120, 0)), FRAME_COL),
-      actor(A["bar"].translate((90, 0, 0)), GREY), actor(A["footL"].translate((-70, 0, -30)), GREY),
-      actor(A["footR"].translate((70, 0, -30)), GREY)]
-render(ex, "04_exploded.png", (-520, -380, 330), c, zoom=1.2, title="Exploded: 2 frame halves, release bar, 2 feet")
+      actor(A["clampL"].translate((-80, 0, 30)), CLAMP_COL), actor(A["clampR"].translate((80, 0, 30)), CLAMP_COL),
+      actor(A["bar"].translate((120, 0, 0)), BAR_COL), actor(A["footL"].translate((-70, 0, -40)), GREY),
+      actor(A["footR"].translate((70, 0, -40)), GREY)]
+render(ex, "03_exploded.png", (-520, -420, 330), c, zoom=1.2,
+       title="Exploded: 2 frame halves, 2 side clamps, release bar, 2 feet")
 
-# single half close-up of inside (ribs, slot, pegs)
+# clamp close-up (left side, clamp pulled off a bit)
+fr = [actor(A["front"], FRAME_COL), actor(A["back"], FRAME_COL), actor(A["footL"], GREY)]
+cl = A["clampL"].translate((-25, 0, 0))
+render(fr + [actor(cl, CLAMP_COL), edges_actor(cl)], "04_clamp_detail.png", (-160, -140, 260), (0, 6, 150),
+       zoom=1.0, reset=False, title="Side clamp pushes on sideways and clicks into 3 grooves")
+
+# inside of a half (pegs + holes + slot)
 fh = c4.frame_half()
 render([actor(fh, FRAME_COL), edges_actor(fh)], "05_frame_half_inside.png", (-70, 170, 120), (45, 0, 25),
-       zoom=1.0, reset=False, title="Frame half - inside: ribs, release-bar slot, pegs")
+       zoom=1.0, reset=False, title="Inside of a half: press-fit pegs, rib lead-ins, bar slot")
 
-# print layouts (each on a 250x250 plate)
-fh_print = fh.rotate((0, 0, 0), (1, 0, 0), 90).translate((0, 0, 0))
-bb = fh_print.val().BoundingBox(); fh_print = fh_print.translate((-bb.xmin, -bb.ymin + 19, -bb.zmin))
-render([actor(fh_print, FRAME_COL)], "06_print_frame_half.png", (125, -250, 420), (125, 125, 0), zoom=1.1,
-       bed=True, title="Print plate: frame half (x2) - face down, no supports")
+# release bar sequence
+def bar_at(pull):
+    return actor(A["bar"].translate((pull, 0, 0)), BAR_COL)
+full = [(i, j, (i + j) % 2) for i in range(7) for j in range(3)]
+stack = [disc_in_board(*m) for m in full]
+render(frame_parts + [bar_at(0)] + stack, "06_bar_in.png", (420, -260, 160), (238, 6, 45),
+       zoom=1.0, reset=False, title="Release bar IN - grip rests against the frame")
+render(frame_parts + [bar_at(120)] + stack, "07_bar_half_out.png", (520, -420, 260), (250, 6, 60),
+       zoom=1.0, reset=False, title="Pull the grip right - bar slides out through the foot notch")
+dropped = [actor(disc.translate((c4.col_x(i), -40 - 33 * k, 0)), RED if (i + k) % 2 else YEL)
+           for i in range(7) for k in range(3)]
+render(frame_parts + [bar_at(240)] + dropped, "08_bar_out_discs_dropped.png", (-120, -700, 380), (180, 6, 90),
+       zoom=1.0, title="Bar out - all discs drop. Slide it back in to play again")
 
-bar = c4.release_bar().rotate((0, 0, 0), (1, 0, 0), 90)
-bb = bar.val().BoundingBox(); bar = bar.translate((-bb.xmin, -bb.ymin + 20, -bb.zmin))
-ft = c4.foot(); bb = ft.val().BoundingBox()
-f1 = ft.translate((-bb.xmin + 10, -bb.ymin + 80, 0))
-f2 = ft.rotate((0, 0, 0), (0, 0, 1), 180); bb2 = f2.val().BoundingBox()
-f2 = f2.translate((-bb2.xmin + 120, -bb2.ymin + 80, 0))
-dl = [actor(disc.translate((178 + (k % 2) * 36, 95 + (k // 2) * 34, 0)), RED if k % 2 else YEL) for k in range(8)]
-render([actor(bar, GREY), actor(f1, GREY), actor(f2, GREY)] + dl, "07_print_bar_feet_discs.png",
-       (125, -250, 420), (125, 125, 0), zoom=1.1, bed=True,
-       title="Print plate: release bar + 2 feet + discs - no supports")
+# print plates (250 x 250)
+def on_bed(shape, x, y):
+    bb = shape.val().BoundingBox()
+    return shape.translate((x - bb.xmin, y - bb.ymin, -bb.zmin))
+fh_p = on_bed(fh.rotate((0, 0, 0), (1, 0, 0), 90), 0, 22)
+render([actor(fh_p, FRAME_COL)], "09_plate_frame_half.png", (125, -250, 420), (125, 125, 0), zoom=1.1,
+       bed=True, title="Plate 1+2: frame half (print x2) - face down, no supports")
+bar_p = on_bed(c4.release_bar().rotate((0, 0, 0), (1, 0, 0), 90), 0, 5)
+ft = c4.foot()
+f1 = on_bed(ft, 5, 50); f2 = on_bed(ft.rotate((0, 0, 0), (0, 0, 1), 180), 65, 50)
+cp = c4.side_clamp().rotate((0, 0, 0), (0, 1, 0), -90).rotate((0, 0, 0), (0, 0, 1), 90)
+c1 = on_bed(cp, 130, 50); c2 = on_bed(cp, 155, 50)
+dl = [actor(on_bed(disc, 185 + (k % 2) * 32, 50 + (k // 2) * 32), RED if k % 2 else YEL) for k in range(12)]
+render([actor(bar_p, BAR_COL), actor(f1, GREY), actor(f2, GREY), actor(c1, CLAMP_COL), actor(c2, CLAMP_COL)] + dl,
+       "10_plate_bar_feet_clamps_discs.png", (125, -250, 420), (125, 125, 0), zoom=1.1, bed=True,
+       title="Plate 3: bar, 2 feet, 2 clamps, discs - no supports")

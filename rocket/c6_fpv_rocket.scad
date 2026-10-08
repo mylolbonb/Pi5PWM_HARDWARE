@@ -1,12 +1,12 @@
 // =====================================================================
-//  Two-stage C6 FPV rocket  -  fully 3D printed
+//  Two-stage FPV rocket (C11-0 booster -> C6 sustainer) - fully 3D printed
 //  Camera: Walksnail Ascent Lite kit (VTX 30.5x30.5x3.5, cam 12x14x15)
 //
 //  Layout (single airframe, "motor-eject" staging):
-//    - Minimum-diameter body: the body IS the 18 mm motor tube.
-//    - Booster C6-0 sits at the very back, butted nozzle-to-nozzle...
-//      (C6-0 top against the C6-5/C6-7 nozzle) with ONE wrap of tape.
-//    - When the C6-0 burns through it lights the sustainer and the
+//    - Minimum-diameter body: the body IS the motor tube.
+//    - Booster C11-0 (24 mm) sits in a wider aft section. Its top pushes on
+//      a printed cone step; the C6 sustainer (18 mm) sits right above it.
+//    - When the C11-0 burns through it lights the sustainer and the
 //      spent booster casing is blown out the back. Nothing else drops.
 //    - The sustainer is stopped by a printed thrust ring.
 //    - Hammerhead FPV payload: VTX board stands vertically in a wider
@@ -25,11 +25,13 @@ part = "assembly"; // [assembly, section, body, payload, nose, all_print]
 /* [Quality] */
 $fn = 96;
 
-/* [Motors - Estes C6 (18 x 70 mm)] */
-motor_d        = 18.0;
+/* [Motors] */
+booster_d      = 24.0;   // Estes C11-0: 24 x 70 mm
+booster_len    = 70.0;
+motor_d        = 18.0;   // Estes C6-5 / C6-7 sustainer: 18 x 70 mm
 motor_len      = 70.0;
-motor_clear    = 0.4;    // diametral clearance for the printed bore
-n_motors       = 2;      // booster + sustainer stacked in the tube
+motor_clear    = 0.4;    // diametral clearance for the printed bores
+aft_taper      = 15;     // smooth step from booster section to upper body
 
 /* [Body] */
 wall           = 1.5;    // body wall
@@ -49,7 +51,7 @@ fin_t          = 1.6;
 lug_id         = 3.8;
 lug_wall       = 0.8;
 lug_len        = 40;
-lug_z          = 75;     // bottom of lug from aft end
+lug_z          = 95;     // bottom of lug from aft end
 
 /* [Payload bay] */
 pay_wall       = 1.5;
@@ -100,9 +102,12 @@ pod_round      = 2.5;    // corner radius of the pod
 pod_taper      = 45;     // length of the streamlined fairing ahead of the camera
 
 // ---------------------------------------------------------------- derived
-bore      = motor_d + motor_clear;
-body_od   = bore + 2*wall;
-motor_sec = n_motors*motor_len;
+bore      = motor_d + motor_clear;        // sustainer bore
+bore_b    = booster_d + motor_clear;      // booster bore
+body_od   = bore + 2*wall;                // upper body
+aft_od    = bore_b + 2*wall;              // booster section
+step_h    = (bore_b - bore)/2;            // 45 deg cone step between bores
+motor_sec = booster_len + step_h + motor_len;
 body_len  = motor_sec + thrust_ring_h + bay_len;
 pay_od    = pay_id + 2*pay_wall;
 nose_R    = pay_od/2;
@@ -131,7 +136,7 @@ module fin() {
     // fin in XZ plane, root on the body surface; all edges fully rounded
     pts = [[0, 0], [0, fin_root], [fin_span, fin_root - fin_le_sweep],
            [fin_span, fin_root - fin_le_sweep - fin_tip]];
-    translate([body_od/2 - 0.6, 0, 0])
+    translate([aft_od/2 - 0.6, 0, 0])
         hull() for (q = pts) translate([q[0], 0, q[1]]) sphere(d = fin_t, $fn = 24);
 }
 
@@ -156,11 +161,16 @@ module body() {
     difference() {
         union() {
             cylinder(d = body_od, h = body_len);
+            cylinder(d = aft_od, h = booster_len);
+            translate([0, 0, booster_len - eps])
+                cylinder(d1 = aft_od, d2 = body_od, h = aft_taper);
             for (i = [0:n_fins-1]) rotate([0, 0, i*360/n_fins]) fin();
             launch_lug();
         }
-        // motor bore (both motors)
-        translate([0, 0, -1]) cylinder(d = bore, h = motor_sec + 1);
+        // booster bore, 45 deg step (booster thrust bears on it), sustainer bore
+        translate([0, 0, -1]) cylinder(d = bore_b, h = booster_len + 1);
+        translate([0, 0, booster_len - eps]) cylinder(d1 = bore_b, d2 = bore, h = step_h + 2*eps);
+        translate([0, 0, booster_len]) cylinder(d = bore, h = motor_sec - booster_len);
         // gas passage through thrust ring
         cylinder(d = thrust_ring_id, h = body_len);
         // recovery bay
@@ -170,7 +180,7 @@ module body() {
         translate([0, 0, body_len - 30])
             rotate([90, 0, 0]) cylinder(d = 2.2, h = body_od + 2, center = true);
         // small chamfer on bore entry
-        translate([0, 0, -eps]) cylinder(d1 = bore + 1, d2 = bore, h = 0.8);
+        translate([0, 0, -eps]) cylinder(d1 = bore_b + 1, d2 = bore_b, h = 0.8);
     }
     }
 }
@@ -349,8 +359,8 @@ module nose() {
 }
 
 // ============================================================== DUMMIES
-module motor_dummy(z, col) {
-    color(col, 0.6) translate([0, 0, z]) cylinder(d = motor_d, h = motor_len);
+module motor_dummy(z, col, d = motor_d, l = motor_len) {
+    color(col, 0.6) translate([0, 0, z]) cylinder(d = d, h = l);
 }
 
 module electronics_dummy(z_pay) {
@@ -374,8 +384,8 @@ module camera_dummy() {
 // ============================================================== OUTPUT
 module assembly() {
     color("orange") body();
-    motor_dummy(0, "red");            // C6-0 booster
-    motor_dummy(motor_len, "yellow"); // C6-5 / C6-7 sustainer
+    motor_dummy(0, "red", booster_d, booster_len);      // C11-0 booster
+    motor_dummy(booster_len + step_h, "yellow");        // C6-5 / C6-7 sustainer
     z_payload = body_len - shoulder_len;
     color("white") translate([0, 0, z_payload]) payload();
     electronics_dummy(z_payload + shoulder_len + trans_len);

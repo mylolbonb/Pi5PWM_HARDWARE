@@ -7,8 +7,8 @@ n_fins, Cr, Ct, span, sweep = 4, 55, 20, 36, 28
 
 x_bay, x_flare, x_body = L_nose, L_nose + L_bay, L_nose + L_bay + L_flare
 x_tail = x_body + L_body
-# nose (ogive)
-CN_n, X_n = 2.0, 0.466*L_nose
+# nose
+CN_n, X_n = 2.0, 0.5*L_nose        # Haack (Von Karman) nose
 # flare: diameter shrinks going aft -> negative lift
 r = d_ref/d_body
 CN_t = 2*((d_body/d_ref)**2 - 1)
@@ -23,7 +23,7 @@ CP = (CN_n*X_n + CN_t*X_t + CN_f*X_f)/CN
 
 # (mass g, position mm)
 items = {
-    "nose + camera pod (printed)": (10.4, 50),
+    "nose + camera pod (printed)": (8.4, 52),
     "camera":                      (3.0, 68),
     "payload bay (printed)":       (7.1, 112),
     "VTX":                         (6.0, 92),

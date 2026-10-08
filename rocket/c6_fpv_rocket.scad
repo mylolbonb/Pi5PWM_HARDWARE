@@ -72,7 +72,7 @@ port_z         = 20;     // from bottom of straight payload section
 vent_d         = 1.5;
 
 /* [Nose + camera] */
-nose_len       = 75;     // tangent ogive length
+nose_len       = 75;     // LD-Haack (Von Karman) nose length
 nose_wall      = 0.8;
 nose_shoulder  = 8;
 tip_round      = 2.0;    // small rounded point
@@ -82,17 +82,17 @@ cam_body_len   = 10.0;   // body depth behind the lens  (MEASURE yours)
 lens_d         = 8.0;    // lens barrel diameter          (MEASURE yours)
 lens_len       = 5.0;    // lens barrel past body front   (MEASURE yours)
 cam_fit        = 0.5;    // total clearance around the camera
-cable_room     = 5.0;    // space behind the camera for the coax to bend inward
+cable_room     = 2.5;    // space behind the camera for the coax to bend inward
 cam_screws     = true;   // M2 side holes (or just glue the camera in)
 cam_screw_back = 5.0;    // M2 side hole: distance behind body front (MEASURE)
 cam_screw_d    = 2.3;
-cam_tilt       = 12;     // lens tilted outward from straight down (deg)
-cam_out        = 0.5;    // lens axis this far outside the payload bay skin
+cam_tilt       = 14;     // lens tilted outward from straight down (deg)
+cam_out        = 0.0;    // lens axis on the payload bay skin line
 cam_lens_z     = 3.5;    // height of lens centre above nose base
 pod_angle      = 135;    // around the body: between two fins, away from the lug
 pod_wall       = 0.8;
-pod_round      = 2.5;    // corner radius of the pod
-pod_taper      = 40;     // length of the streamlined fairing ahead of the camera
+pod_round      = 1.5;    // corner radius of the pod (bigger thins the corners)
+pod_taper      = 28;     // length of the streamlined fairing ahead of the camera
 
 // ---------------------------------------------------------------- derived
 bore      = motor_d + motor_clear;        // sustainer bore
@@ -101,11 +101,15 @@ motor_sec = motor_len;
 body_len  = motor_sec + thrust_ring_h + bay_len;
 pay_od    = pay_id + 2*pay_wall;
 nose_R    = pay_od/2;
-rho       = (nose_R*nose_R + nose_len*nose_len) / (2*nose_R);
-face_r    = tip_round;
-nose_cut  = sqrt(rho*rho - pow(face_r - nose_R + rho, 2));
+// LD-Haack (Von Karman) profile: least drag for its length, slimmer than an ogive
+function nose_r(z) = let(x = max(nose_len - z, 0),
+                         th = acos(1 - 2*x/nose_len))          // degrees
+                     nose_R/sqrt(PI) * sqrt(th*PI/180 - sin(2*th)/2);
+// height where the profile radius drops to tip_round (bisection)
+function find_cut(lo, hi, n = 40) = n == 0 ? lo :
+    let(m = (lo + hi)/2) nose_r(m) > tip_round ? find_cut(m, hi, n - 1) : find_cut(lo, m, n - 1);
+nose_cut  = find_cut(0, nose_len);
 nose_top  = nose_cut + tip_round;
-function nose_r(z) = sqrt(rho*rho - z*z) + nose_R - rho;   // ogive radius at height z
 eps = 0.01;
 
 echo(str("Body OD = ", body_od, " mm, body length = ", body_len, " mm"));
@@ -231,12 +235,11 @@ module payload() {
 }
 
 // ================================================================== NOSE
-// Tangent ogive with a small rounded point.
+// Haack nose with a small rounded point.
 module ogive_solid(off = 0) {
-    steps = 60;
+    steps = 80;
     pts = [ for (i = [0:steps])
-              let(z = nose_cut*i/steps,
-                  r = sqrt(rho*rho - z*z) + nose_R - rho)
+              let(z = nose_cut*i/steps, r = nose_r(z))
               [max(r - off, 0.01), z] ];
     rotate_extrude() polygon(concat([[0, 0]], pts, [[0, nose_cut]]));
 }
@@ -282,13 +285,13 @@ module pod_block() {
 
 // streamlined fairing ahead of the block: a loft of rounded sections that
 // shrink with a parabolic profile and slide in onto the ogive skin
-function sec_s(t) = 1 - t*t;
+function sec_s(t) = pow(1 - t, 0.85);      // shrinks steadily: short, low ridge
 module pod_section(t) {
     top_out = c2g([-pod_hx, 0, pod_zb]);   // outer top edge of the block
     z  = top_out[2] + pod_taper*t;
     s  = max(sec_s(t), 0.04);
     hx = pod_hx*s; hy = pod_hy*s; r = min(pod_round, hx, hy);
-    e  = top_out[0] + (nose_r(z) - 0.2 - top_out[0])*pow(t, 1.3);   // outer edge
+    e  = top_out[0] + (nose_r(z) - 0.2 - top_out[0])*t;            // outer edge
     translate([e - hx, 0, z])
         hull() for (x = [-1, 1], y = [-1, 1])
             translate([x*(hx - r), y*(hy - r), 0]) sphere(r, $fn = 24);

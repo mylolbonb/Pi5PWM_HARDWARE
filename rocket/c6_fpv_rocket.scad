@@ -1,14 +1,10 @@
 // =====================================================================
-//  Two-stage FPV rocket (C11-0 booster -> C6 sustainer) - fully 3D printed
+//  Single-stage C6 FPV rocket - small, light, fully 3D printed
 //  Camera: Walksnail Ascent Lite kit (VTX 30.5x30.5x3.5, cam 12x14x15)
 //
-//  Layout (single airframe, "motor-eject" staging):
-//    - Minimum-diameter body: the body IS the motor tube.
-//    - Booster C11-0 (24 mm) sits in a wider aft section. Its top pushes on
-//      a printed cone step; the C6 sustainer (18 mm) sits right above it.
-//    - When the C11-0 burns through it lights the sustainer and the
-//      spent booster casing is blown out the back. Nothing else drops.
-//    - The sustainer is stopped by a printed thrust ring.
+//  Layout:
+//    - Minimum-diameter body: the body IS the 18 mm motor tube (Estes C6).
+//    - The motor is stopped by a printed thrust ring; friction-fit with tape.
 //    - Hammerhead FPV payload: VTX board stands vertically in a wider
 //      bay, battery beside it.
 //    - Camera sits in a side pod at the base of the nose and looks DOWN
@@ -25,42 +21,39 @@ part = "assembly"; // [assembly, section, body, payload, nose, all_print]
 /* [Quality] */
 $fn = 96;
 
-/* [Motors] */
-booster_d      = 24.0;   // Estes C11-0: 24 x 70 mm
-booster_len    = 70.0;
-motor_d        = 18.0;   // Estes C6-5 / C6-7 sustainer: 18 x 70 mm
+/* [Motor - Estes C6 (18 x 70 mm)] */
+motor_d        = 18.0;
 motor_len      = 70.0;
-motor_clear    = 0.4;    // diametral clearance for the printed bores
-aft_taper      = 15;     // smooth step from booster section to upper body
+motor_clear    = 0.4;    // diametral clearance for the printed bore
 
 /* [Body] */
-wall           = 1.5;    // body wall
+wall           = 0.8;    // body wall (2 perimeters)
 thrust_ring_h  = 2.0;
 thrust_ring_id = 13.0;   // ejection gas passes through this
-bay_len        = 60;     // streamer + wadding bay above the thrust ring
+bay_len        = 35;     // streamer + wadding bay above the thrust ring
 
 /* [Fins] */
-n_fins         = 3;
+n_fins         = 4;
 fin_root       = 55;
 fin_tip        = 20;
-fin_span       = 34;
+fin_span       = 36;
 fin_le_sweep   = 28;     // leading edge sweep (along body axis)
-fin_t          = 1.6;
+fin_t          = 1.4;
 
 /* [Launch lug - 1/8 in rod] */
 lug_id         = 3.8;
 lug_wall       = 0.8;
-lug_len        = 40;
-lug_z          = 95;     // bottom of lug from aft end
+lug_len        = 30;
+lug_z          = 55;     // bottom of lug from aft end
 
 /* [Payload bay] */
-pay_wall       = 1.5;
-pay_id         = 32.0;   // VTX 30.5 board stands vertically -> needs ~31.5
-pay_len        = 44;     // straight section length
-trans_len      = 22;     // body -> payload flare
-shoulder_len   = 15;     // slides into top of body
+pay_wall       = 0.8;
+pay_id         = 31.6;   // VTX 30.5 board stands vertically
+pay_len        = 33;     // straight section: just the VTX height
+trans_len      = 18;     // body -> payload flare
+shoulder_len   = 12;     // slides into top of body
 shoulder_clear = 0.3;
-bulkhead_t     = 1.2;
+bulkhead_t     = 0.8;
 
 /* [Walksnail Ascent Lite VTX] */
 vtx_w          = 30.5;
@@ -68,9 +61,9 @@ vtx_t          = 5.0;    // board 3.5 + parts; slot width
 vtx_guide_d    = 2.0;    // how far the guides reach in from the wall
 
 /* [Battery (1S LiPo, VTX takes 3-12.6 V)] */
-batt_w         = 18;
-batt_t         = 7;
-batt_len       = 40;
+batt_w         = 12;     // small 1S ~150 mAh
+batt_t         = 6;
+batt_len       = 30;
 
 /* [Switch / charge port] */
 port_w         = 6;
@@ -79,9 +72,9 @@ port_z         = 20;     // from bottom of straight payload section
 vent_d         = 1.5;
 
 /* [Nose + camera] */
-nose_len       = 85;     // tangent ogive length
+nose_len       = 75;     // tangent ogive length
 nose_wall      = 0.8;
-nose_shoulder  = 10;
+nose_shoulder  = 8;
 tip_round      = 2.0;    // small rounded point
 cam_w          = 14.0;   // camera body width  (tangential, M2 side holes)
 cam_h          = 12.0;   // camera body height (radial)
@@ -96,18 +89,15 @@ cam_screw_d    = 2.3;
 cam_tilt       = 12;     // lens tilted outward from straight down (deg)
 cam_out        = 0.5;    // lens axis this far outside the payload bay skin
 cam_lens_z     = 3.5;    // height of lens centre above nose base
-pod_angle      = 60;     // around the body: 60 = between two fins
-pod_wall       = 1.0;
+pod_angle      = 135;    // around the body: between two fins, away from the lug
+pod_wall       = 0.8;
 pod_round      = 2.5;    // corner radius of the pod
-pod_taper      = 45;     // length of the streamlined fairing ahead of the camera
+pod_taper      = 40;     // length of the streamlined fairing ahead of the camera
 
 // ---------------------------------------------------------------- derived
 bore      = motor_d + motor_clear;        // sustainer bore
-bore_b    = booster_d + motor_clear;      // booster bore
-body_od   = bore + 2*wall;                // upper body
-aft_od    = bore_b + 2*wall;              // booster section
-step_h    = (bore_b - bore)/2;            // 45 deg cone step between bores
-motor_sec = booster_len + step_h + motor_len;
+body_od   = bore + 2*wall;
+motor_sec = motor_len;
 body_len  = motor_sec + thrust_ring_h + bay_len;
 pay_od    = pay_id + 2*pay_wall;
 nose_R    = pay_od/2;
@@ -136,7 +126,7 @@ module fin() {
     // fin in XZ plane, root on the body surface; all edges fully rounded
     pts = [[0, 0], [0, fin_root], [fin_span, fin_root - fin_le_sweep],
            [fin_span, fin_root - fin_le_sweep - fin_tip]];
-    translate([aft_od/2 - 0.6, 0, 0])
+    translate([body_od/2 - 0.4, 0, 0])
         hull() for (q = pts) translate([q[0], 0, q[1]]) sphere(d = fin_t, $fn = 24);
 }
 
@@ -161,26 +151,21 @@ module body() {
     difference() {
         union() {
             cylinder(d = body_od, h = body_len);
-            cylinder(d = aft_od, h = booster_len);
-            translate([0, 0, booster_len - eps])
-                cylinder(d1 = aft_od, d2 = body_od, h = aft_taper);
             for (i = [0:n_fins-1]) rotate([0, 0, i*360/n_fins]) fin();
             launch_lug();
         }
-        // booster bore, 45 deg step (booster thrust bears on it), sustainer bore
-        translate([0, 0, -1]) cylinder(d = bore_b, h = booster_len + 1);
-        translate([0, 0, booster_len - eps]) cylinder(d1 = bore_b, d2 = bore, h = step_h + 2*eps);
-        translate([0, 0, booster_len]) cylinder(d = bore, h = motor_sec - booster_len);
+        // motor bore
+        translate([0, 0, -1]) cylinder(d = bore, h = motor_sec + 1);
         // gas passage through thrust ring
         cylinder(d = thrust_ring_id, h = body_len);
         // recovery bay
         translate([0, 0, motor_sec + thrust_ring_h])
             cylinder(d = bore, h = bay_len + 1);
         // shock cord tie holes (cross hole through both walls)
-        translate([0, 0, body_len - 30])
+        translate([0, 0, body_len - 20])
             rotate([90, 0, 0]) cylinder(d = 2.2, h = body_od + 2, center = true);
         // small chamfer on bore entry
-        translate([0, 0, -eps]) cylinder(d1 = bore_b + 1, d2 = bore_b, h = 0.8);
+        translate([0, 0, -eps]) cylinder(d1 = bore + 1, d2 = bore, h = 0.8);
     }
     }
 }
@@ -384,8 +369,7 @@ module camera_dummy() {
 // ============================================================== OUTPUT
 module assembly() {
     color("orange") body();
-    motor_dummy(0, "red", booster_d, booster_len);      // C11-0 booster
-    motor_dummy(booster_len + step_h, "yellow");        // C6-5 / C6-7 sustainer
+    motor_dummy(0, "yellow");   // C6
     z_payload = body_len - shoulder_len;
     color("white") translate([0, 0, z_payload]) payload();
     electronics_dummy(z_payload + shoulder_len + trans_len);

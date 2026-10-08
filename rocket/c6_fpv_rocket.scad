@@ -10,7 +10,12 @@
 //      spent booster casing is blown out the back. Nothing else drops.
 //    - The sustainer is stopped by a printed thrust ring.
 //    - Hammerhead FPV payload: VTX board stands vertically in a wider
-//      bay, battery beside it, camera looks forward out of the nose tip.
+//      bay, battery beside it.
+//    - Camera sits in a side pod at the base of the nose and looks DOWN
+//      along the body (sees the fins and the ground falling away).
+//    - At apogee the sustainer ejection charge pushes the whole front
+//      (payload bay + nose, glued together) off the body; it stays tied
+//      to the body with kevlar and comes down on a streamer.
 //
 //  Select what to render/export with `part`.
 // =====================================================================
@@ -27,10 +32,10 @@ motor_clear    = 0.4;    // diametral clearance for the printed bore
 n_motors       = 2;      // booster + sustainer stacked in the tube
 
 /* [Body] */
-wall           = 0.8;    // body wall (2 perimeters @ 0.4)
+wall           = 1.5;    // body wall
 thrust_ring_h  = 2.0;
 thrust_ring_id = 13.0;   // ejection gas passes through this
-bay_len        = 40;     // space above the thrust ring (ejection gas / cord)
+bay_len        = 60;     // streamer + wadding bay above the thrust ring
 
 /* [Fins] */
 n_fins         = 3;
@@ -47,7 +52,7 @@ lug_len        = 40;
 lug_z          = 75;     // bottom of lug from aft end
 
 /* [Payload bay] */
-pay_wall       = 0.9;
+pay_wall       = 1.5;
 pay_id         = 32.0;   // VTX 30.5 board stands vertically -> needs ~31.5
 pay_len        = 44;     // straight section length
 trans_len      = 22;     // body -> payload flare
@@ -72,12 +77,12 @@ port_z         = 20;     // from bottom of straight payload section
 vent_d         = 1.5;
 
 /* [Nose + camera] */
-nose_len       = 85;     // length of the (un-blunted) tangent ogive
-nose_wall      = 0.9;
+nose_len       = 85;     // tangent ogive length
+nose_wall      = 1.5;
 nose_shoulder  = 10;
-tip_round      = 5;      // radius of the rounded camera dome edge
-cam_w          = 14.0;   // camera body width  (screw faces are +/-X)
-cam_h          = 12.0;   // camera body height
+tip_round      = 2.0;    // small rounded point
+cam_w          = 14.0;   // camera body width  (M2 screw faces, tangential)
+cam_h          = 12.0;   // camera body height (radial)
 cam_body_len   = 10.0;   // body depth behind the lens
 lens_d         = 8.0;    // lens barrel diameter
 lens_len       = 5.0;    // lens barrel sticking out of the body front
@@ -85,6 +90,13 @@ cam_fit        = 0.3;
 cam_screw_back = 5.0;    // M2 side screw: distance behind body front (MEASURE)
 cam_screw_d    = 2.3;    // M2 clearance
 cam_head_d     = 4.2;    // M2 head counterbore
+cam_tilt       = 8;      // lens tilted outward from straight down (deg)
+cam_out        = 1.5;    // lens axis this far outside the bay skin
+cam_lens_z     = 7;      // height of lens centre above nose base
+pod_angle      = 0;      // where the pod sits around the body (0 = over a fin)
+pod_wall       = 1.5;
+pod_side_wall  = 2.5;    // thicker sides so screw heads sit flush
+pod_taper      = 40;     // length of the fairing that blends pod into nose
 
 // ---------------------------------------------------------------- derived
 bore      = motor_d + motor_clear;
@@ -94,12 +106,10 @@ body_len  = motor_sec + thrust_ring_h + bay_len;
 pay_od    = pay_id + 2*pay_wall;
 nose_R    = pay_od/2;
 rho       = (nose_R*nose_R + nose_len*nose_len) / (2*nose_R);
-// blunt tip radius just big enough to swallow the camera body
-face_r    = sqrt(cam_w*cam_w + cam_h*cam_h)/2 + cam_fit + nose_wall + 0.3;
-// height where the ogive radius drops to face_r -> dome starts there
+face_r    = tip_round;
 nose_cut  = sqrt(rho*rho - pow(face_r - nose_R + rho, 2));
-nose_top  = nose_cut + tip_round;            // front face height
-cam_front = nose_top - lens_len;             // camera body front face
+nose_top  = nose_cut + tip_round;
+function nose_r(z) = sqrt(rho*rho - z*z) + nose_R - rho;   // ogive radius at height z
 eps = 0.01;
 
 echo(str("Body OD = ", body_od, " mm, body length = ", body_len, " mm"));
@@ -213,8 +223,7 @@ module payload() {
 }
 
 // ================================================================== NOSE
-// Blunted tangent ogive: the ogive runs up until it is just wide enough
-// for the camera, then a rounded dome closes it around the lens.
+// Tangent ogive with a small rounded point.
 module ogive_solid(off = 0) {
     steps = 60;
     pts = [ for (i = [0:steps])
@@ -227,15 +236,32 @@ module ogive_solid(off = 0) {
 module nose_outer(off = 0) {
     hull() {
         ogive_solid(off);
-        translate([0, 0, nose_cut])
-            rotate_extrude()
-                translate([face_r - tip_round, 0]) circle(r = tip_round - off);
+        translate([0, 0, nose_cut]) sphere(r = max(tip_round - off, 0.3));
     }
 }
 
-module cam_screw_axis() {
-    // M2 screws go in from the outside along X into the camera side threads
-    translate([0, 0, cam_front - cam_screw_back]) rotate([0, 90, 0]) children();
+// Camera frame: origin = centre of camera body front face, local +Z = view
+// direction (down, tilted out), local +X = radially inward, local Y = screws.
+module cam_frame() {
+    lens_x = nose_R + cam_out;
+    rotate([0, 0, pod_angle])
+        translate([lens_x - lens_len*sin(cam_tilt), 0, cam_lens_z + lens_len*cos(cam_tilt)])
+            rotate([0, 180 - cam_tilt, 0])
+                children();
+}
+
+module pod_envelope() {
+    hull() {
+        cam_frame()
+            translate([-(cam_h/2 + cam_fit/2 + pod_wall), -(cam_w/2 + cam_fit/2 + pod_side_wall),
+                       -(cam_body_len + pod_wall)])
+                cube([cam_h + cam_fit + 2*pod_wall, cam_w + cam_fit + 2*pod_side_wall,
+                      cam_body_len + pod_wall + lens_len]);
+        // fairing nose: blends back into the ogive surface
+        rotate([0, 0, pod_angle])
+            translate([nose_r(cam_lens_z + pod_taper) - 1.5, 0, cam_lens_z + pod_taper])
+                sphere(r = 1.5);
+    }
 }
 
 module nose() {
@@ -245,14 +271,10 @@ module nose() {
                 nose_outer();
                 translate([0, 0, -eps]) nose_outer(nose_wall);
             }
-            // side bosses that the camera screws clamp against
+            // camera pod (clipped flat at the nose base)
             intersection() {
-                nose_outer();
-                cam_screw_axis()
-                    difference() {
-                        cube([8, 7, 2*face_r + 10], center = true);
-                        cube([9, 8, cam_w + cam_fit], center = true);
-                    }
+                pod_envelope();
+                cylinder(r = 100, h = 200);
             }
             // base ring tying shell to shoulder
             cylinder(r = nose_R - 0.2, h = nose_wall);
@@ -260,14 +282,19 @@ module nose() {
             translate([0, 0, -nose_shoulder])
                 cylinder(d = pay_id - shoulder_clear, h = nose_shoulder + eps);
         }
-        // lens hole (also centres the camera)
-        translate([0, 0, cam_front - 1]) cylinder(d = lens_d + 0.4, h = lens_len + 5);
-        // M2 clearance through boss + shell, counterbored so heads sit flush
-        cam_screw_axis() {
-            cylinder(d = cam_screw_d, h = 2*face_r + 10, center = true);
-            for (s = [-1, 1])
-                translate([0, 0, s > 0 ? cam_w/2 + cam_fit + 1.2 : -(face_r + 10)])
-                    cylinder(d = cam_head_d, h = face_r + 10 - cam_w/2 - cam_fit - 1.2);
+        // camera pocket, open towards the inside of the nose for loading
+        cam_frame() {
+            translate([-(cam_h + cam_fit)/2, -(cam_w + cam_fit)/2, -cam_body_len - 0.5])
+                cube([cam_h + cam_fit + 12, cam_w + cam_fit, cam_body_len + 0.5 + eps]);
+            // lens window
+            cylinder(d = lens_d + 0.4, h = lens_len + 5);
+            // M2 screws, counterbored on both sides
+            translate([0, 0, -cam_screw_back]) rotate([90, 0, 0]) {
+                cylinder(d = cam_screw_d, h = cam_w + 20, center = true);
+                for (s = [-1, 1])
+                    translate([0, 0, s > 0 ? cam_w/2 + cam_fit + 1.2 : -(cam_w/2 + 20)])
+                        cylinder(d = cam_head_d, h = 20 - 1.2 - cam_fit);
+            }
         }
         // hollow shoulder
         translate([0, 0, -nose_shoulder - 1])
@@ -288,11 +315,14 @@ module electronics_dummy(z_pay) {
 }
 
 module camera_dummy() {
-    color("black") {
-        translate([-cam_w/2, -cam_h/2, cam_front - cam_body_len]) cube([cam_w, cam_h, cam_body_len]);
-        translate([0, 0, cam_front]) cylinder(d = lens_d, h = lens_len - 0.3);
+    cam_frame() {
+        color("black") {
+            translate([-cam_h/2, -cam_w/2, -cam_body_len]) cube([cam_h, cam_w, cam_body_len]);
+            cylinder(d = lens_d, h = lens_len - 0.3);
+        }
+        color("silver") translate([0, 0, -cam_screw_back]) rotate([90, 0, 0])
+            cylinder(d = 2, h = cam_w + 5, center = true);
     }
-    color("silver") cam_screw_axis() cylinder(d = 2, h = cam_w + 4, center = true);
 }
 
 // ============================================================== OUTPUT

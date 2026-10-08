@@ -15,7 +15,7 @@
 //  Select what to render/export with `part`.
 // =====================================================================
 
-part = "assembly"; // [assembly, body, payload, nose, all_print]
+part = "assembly"; // [assembly, section, body, payload, nose, all_print]
 
 /* [Quality] */
 $fn = 96;
@@ -27,38 +27,38 @@ motor_clear    = 0.4;    // diametral clearance for the printed bore
 n_motors       = 2;      // booster + sustainer stacked in the tube
 
 /* [Body] */
-wall           = 1.2;    // body wall
-thrust_ring_h  = 3.0;
+wall           = 0.8;    // body wall (2 perimeters @ 0.4)
+thrust_ring_h  = 2.0;
 thrust_ring_id = 13.0;   // ejection gas passes through this
-bay_len        = 85;     // recovery bay above the thrust ring
+bay_len        = 40;     // space above the thrust ring (ejection gas / cord)
 
 /* [Fins] */
 n_fins         = 3;
-fin_root       = 65;
-fin_tip        = 25;
-fin_span       = 42;
-fin_le_sweep   = 32;     // leading edge sweep (along body axis)
-fin_t          = 2.4;
+fin_root       = 55;
+fin_tip        = 20;
+fin_span       = 34;
+fin_le_sweep   = 28;     // leading edge sweep (along body axis)
+fin_t          = 1.6;
 
 /* [Launch lug - 1/8 in rod] */
 lug_id         = 3.8;
-lug_wall       = 1.0;
+lug_wall       = 0.8;
 lug_len        = 40;
 lug_z          = 75;     // bottom of lug from aft end
 
 /* [Payload bay] */
-pay_wall       = 1.6;
+pay_wall       = 0.9;
 pay_id         = 32.0;   // VTX 30.5 board stands vertically -> needs ~31.5
-pay_len        = 52;     // straight section length
-trans_len      = 25;     // body -> payload flare
-shoulder_len   = 20;     // slides into top of body
+pay_len        = 44;     // straight section length
+trans_len      = 22;     // body -> payload flare
+shoulder_len   = 15;     // slides into top of body
 shoulder_clear = 0.3;
-bulkhead_t     = 2.5;
+bulkhead_t     = 1.2;
 
 /* [Walksnail Ascent Lite VTX] */
 vtx_w          = 30.5;
 vtx_t          = 5.0;    // board 3.5 + parts; slot width
-vtx_guide_d    = 3.0;    // how far the guides reach in from the wall
+vtx_guide_d    = 2.0;    // how far the guides reach in from the wall
 
 /* [Battery (1S LiPo, VTX takes 3-12.6 V)] */
 batt_w         = 18;
@@ -72,15 +72,19 @@ port_z         = 20;     // from bottom of straight payload section
 vent_d         = 1.5;
 
 /* [Nose + camera] */
-nose_len       = 70;
-nose_wall      = 1.6;
-nose_shoulder  = 12;
-tip_r          = 11;     // flat front face radius (camera window)
-cam_w          = 14.0;   // camera body
-cam_h          = 12.0;
-cam_d          = 15.0;
-cam_fit        = 0.4;
-lens_d         = 10.0;   // hole in front face
+nose_len       = 85;     // length of the (un-blunted) tangent ogive
+nose_wall      = 0.9;
+nose_shoulder  = 10;
+tip_round      = 5;      // radius of the rounded camera dome edge
+cam_w          = 14.0;   // camera body width  (screw faces are +/-X)
+cam_h          = 12.0;   // camera body height
+cam_body_len   = 10.0;   // body depth behind the lens
+lens_d         = 8.0;    // lens barrel diameter
+lens_len       = 5.0;    // lens barrel sticking out of the body front
+cam_fit        = 0.3;
+cam_screw_back = 5.0;    // M2 side screw: distance behind body front (MEASURE)
+cam_screw_d    = 2.3;    // M2 clearance
+cam_head_d     = 4.2;    // M2 head counterbore
 
 // ---------------------------------------------------------------- derived
 bore      = motor_d + motor_clear;
@@ -90,13 +94,17 @@ body_len  = motor_sec + thrust_ring_h + bay_len;
 pay_od    = pay_id + 2*pay_wall;
 nose_R    = pay_od/2;
 rho       = (nose_R*nose_R + nose_len*nose_len) / (2*nose_R);
-// height above nose base where the ogive radius drops to tip_r
-nose_cut  = sqrt(rho*rho - pow(tip_r - nose_R + rho, 2));
+// blunt tip radius just big enough to swallow the camera body
+face_r    = sqrt(cam_w*cam_w + cam_h*cam_h)/2 + cam_fit + nose_wall + 0.3;
+// height where the ogive radius drops to face_r -> dome starts there
+nose_cut  = sqrt(rho*rho - pow(face_r - nose_R + rho, 2));
+nose_top  = nose_cut + tip_round;            // front face height
+cam_front = nose_top - lens_len;             // camera body front face
 eps = 0.01;
 
 echo(str("Body OD = ", body_od, " mm, body length = ", body_len, " mm"));
 echo(str("Payload OD = ", pay_od, " mm"));
-echo(str("Overall length ~ ", body_len + trans_len + pay_len + nose_cut, " mm"));
+echo(str("Overall length ~ ", body_len + trans_len + pay_len + nose_top, " mm"));
 
 // ================================================================== BODY
 module fin_2d() {
@@ -182,7 +190,7 @@ module payload() {
         }
         // hollow shoulder (cord anchor bar is added back later)
         translate([0, 0, -1])
-            cylinder(d = bore - shoulder_clear - 2*1.4, h = shoulder_len + 1 - eps);
+            cylinder(d = bore - shoulder_clear - 2*1.0, h = shoulder_len + 1 - eps);
         // hollow flare above bulkhead
         translate([0, 0, z_tr + bulkhead_t])
             cylinder(d1 = body_od - 2*pay_wall + (pay_od - body_od)*bulkhead_t/trans_len,
@@ -205,36 +213,46 @@ module payload() {
 }
 
 // ================================================================== NOSE
-
-module ogive_solid(R, off = 0) {
-    // rotate_extrude profile of tangent ogive, z = 0 at base, truncated at nose_cut
+// Blunted tangent ogive: the ogive runs up until it is just wide enough
+// for the camera, then a rounded dome closes it around the lens.
+module ogive_solid(off = 0) {
     steps = 60;
     pts = [ for (i = [0:steps])
               let(z = nose_cut*i/steps,
-                  x = nose_len - z,                    // distance from virtual tip
-                  r = sqrt(rho*rho - pow(nose_len - x, 2)) + nose_R - rho)
+                  r = sqrt(rho*rho - z*z) + nose_R - rho)
               [max(r - off, 0.01), z] ];
     rotate_extrude() polygon(concat([[0, 0]], pts, [[0, nose_cut]]));
 }
 
+module nose_outer(off = 0) {
+    hull() {
+        ogive_solid(off);
+        translate([0, 0, nose_cut])
+            rotate_extrude()
+                translate([face_r - tip_round, 0]) circle(r = tip_round - off);
+    }
+}
+
+module cam_screw_axis() {
+    // M2 screws go in from the outside along X into the camera side threads
+    translate([0, 0, cam_front - cam_screw_back]) rotate([0, 90, 0]) children();
+}
+
 module nose() {
-    cam_box = [cam_w + cam_fit, cam_h + cam_fit, cam_d];
-    face_t  = nose_wall;
     difference() {
         union() {
-            // shell
             difference() {
-                ogive_solid(nose_R);
-                translate([0, 0, -eps]) ogive_solid(nose_R, nose_wall);
+                nose_outer();
+                translate([0, 0, -eps]) nose_outer(nose_wall);
             }
-            // solid front face
-            translate([0, 0, nose_cut - face_t])
-                cylinder(r = tip_r, h = face_t);
-            // camera sleeve
+            // side bosses that the camera screws clamp against
             intersection() {
-                ogive_solid(nose_R);
-                translate([0, 0, nose_cut - cam_d/2])
-                    cube([cam_box.x + 2.4, cam_box.y + 2.4, cam_d], center = true);
+                nose_outer();
+                cam_screw_axis()
+                    difference() {
+                        cube([8, 7, 2*face_r + 10], center = true);
+                        cube([9, 8, cam_w + cam_fit], center = true);
+                    }
             }
             // base ring tying shell to shoulder
             cylinder(r = nose_R - 0.2, h = nose_wall);
@@ -242,14 +260,18 @@ module nose() {
             translate([0, 0, -nose_shoulder])
                 cylinder(d = pay_id - shoulder_clear, h = nose_shoulder + eps);
         }
-        // camera pocket (open at the back for loading + cable)
-        translate([0, 0, nose_cut - face_t - cam_d/2 - 0.5])
-            cube([cam_box.x, cam_box.y, cam_d + 1], center = true);
-        // lens window
-        translate([0, 0, nose_cut - face_t - 1]) cylinder(d = lens_d, h = face_t + 2);
+        // lens hole (also centres the camera)
+        translate([0, 0, cam_front - 1]) cylinder(d = lens_d + 0.4, h = lens_len + 5);
+        // M2 clearance through boss + shell, counterbored so heads sit flush
+        cam_screw_axis() {
+            cylinder(d = cam_screw_d, h = 2*face_r + 10, center = true);
+            for (s = [-1, 1])
+                translate([0, 0, s > 0 ? cam_w/2 + cam_fit + 1.2 : -(face_r + 10)])
+                    cylinder(d = cam_head_d, h = face_r + 10 - cam_w/2 - cam_fit - 1.2);
+        }
         // hollow shoulder
         translate([0, 0, -nose_shoulder - 1])
-            cylinder(d = pay_id - shoulder_clear - 2*1.4, h = nose_shoulder + nose_wall + 2);
+            cylinder(d = pay_id - shoulder_clear - 2*1.0, h = nose_shoulder + nose_wall + 2);
     }
 }
 
@@ -265,6 +287,14 @@ module electronics_dummy(z_pay) {
         translate([-pay_id/2 + 2, -batt_w/2, z_pay + 2]) cube([batt_t, batt_w, batt_len]);
 }
 
+module camera_dummy() {
+    color("black") {
+        translate([-cam_w/2, -cam_h/2, cam_front - cam_body_len]) cube([cam_w, cam_h, cam_body_len]);
+        translate([0, 0, cam_front]) cylinder(d = lens_d, h = lens_len - 0.3);
+    }
+    color("silver") cam_screw_axis() cylinder(d = 2, h = cam_w + 4, center = true);
+}
+
 // ============================================================== OUTPUT
 module assembly() {
     color("orange") body();
@@ -273,16 +303,27 @@ module assembly() {
     z_payload = body_len - shoulder_len;
     color("white") translate([0, 0, z_payload]) payload();
     electronics_dummy(z_payload + shoulder_len + trans_len);
-    color("gray")
-        translate([0, 0, z_payload + shoulder_len + trans_len + pay_len]) nose();
+    translate([0, 0, z_payload + shoulder_len + trans_len + pay_len]) {
+        color("gray") nose();
+        camera_dummy();
+    }
+}
+
+module section() {
+    // assembly cut in half along the XZ plane to show the insides
+    difference() {
+        assembly();
+        translate([-100, -200, -10]) cube([200, 200, 600]);
+    }
 }
 
 if (part == "assembly")  assembly();
+if (part == "section")   section();
 if (part == "body")      body();
 if (part == "payload")   payload();
 if (part == "nose")      translate([0, 0, nose_shoulder]) nose();
 if (part == "all_print") {
     body();
-    translate([60, 0, 0]) payload();
-    translate([110, 0, nose_shoulder]) nose();
+    translate([55, 0, 0]) payload();
+    translate([100, 0, nose_shoulder]) nose();
 }

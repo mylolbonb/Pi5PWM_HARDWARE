@@ -96,7 +96,7 @@ render(fr + [actor(cl, CLAMP_COL), edges_actor(cl)], "04_clamp_detail.png", (-16
 # inside of a half (pegs + holes + slot)
 fh = c4.frame_half()
 render([actor(fh, FRAME_COL), edges_actor(fh)], "05_frame_half_inside.png", (-70, 170, 120), (45, 0, 25),
-       zoom=1.0, reset=False, title="Inside of a half: press-fit pegs, rib lead-ins, bar slot")
+       zoom=1.0, reset=False, title="Inside of a half: tie pegs on every rib stop the middle gaping")
 
 # release bar sequence
 def bar_at(pull):

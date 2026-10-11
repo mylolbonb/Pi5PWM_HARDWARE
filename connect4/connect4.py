@@ -11,29 +11,32 @@ import cadquery as cq
 # ---------------- parameters (mm) ----------------
 COLS, ROWS = 7, 6
 DISC_D, DISC_T = 29.0, 3.0
-PITCH_X = 34.0            # column pitch
+FRAME_W = 250.0
+WALL_W = 7.0              # side walls (fixed: the feet are sized for them)
+CHAN_W = 30.6             # column channel width  -> 0.8 mm clearance per side
+RIB_W = (FRAME_W - 2 * WALL_W - COLS * CHAN_W) / (COLS - 1)   # 3.63 (room for tie pegs)
+PITCH_X = CHAN_W + RIB_W  # 34.23 column pitch
 PITCH_Z = DISC_D          # row pitch (discs stack on each other)
-CHAN_W = 32.0             # column channel width  -> 1.5 mm clearance per side
-RIB_W = PITCH_X - CHAN_W  # 2.0
 CHAN_D = 4.5              # gap between plates    -> 0.75 mm clearance per side
 PLATE_T = 1.2              # 6 layers @ 0.2 mm
 HALF_T = PLATE_T + CHAN_D / 2           # 3.45 (one printed half)
 FRAME_T = 2 * HALF_T                    # 6.9
-FRAME_W = 250.0
-WALL_W = (FRAME_W - COLS * CHAN_W - (COLS - 1) * RIB_W) / 2  # 7.0
 BAR_Z0, BAR_Z1 = 12.0, 20.0             # release-bar slot
 STACK_TOP = BAR_Z1 + ROWS * PITCH_Z     # 194
 FRAME_H = STACK_TOP + 6.0               # 200
-WIN_W, WIN_H, WIN_R = 30.0, 24.0, 6.0     # rounded-rect windows (disc overlaps 2.5 mm top/bottom)
-PEG_D, PEG_HOLE_D, PEG_L = 3.5, 3.7, 2.5   # snug press fit
+WIN_D = 24.0              # round windows: disc overlaps 2.5 mm ALL the way round
+PEG_D, PEG_HOLE_D, PEG_L = 3.5, 3.7, 2.5   # side-wall pegs, snug press fit
 PEG_Z = [6.0, 45.0, 105.0, 165.0, 194.0]
+# tie pegs along every rib so the halves can't spread apart in the middle
+TIE_D, TIE_HOLE_D, TIE_L = 2.2, 2.3, 1.8
+TIE_Z = [6.0] + [BAR_Z1 + k * PITCH_Z for k in range(1, ROWS)] + [FRAME_H - 4.0]
 CLR = 0.15
 
 # side clamps (U-channels that snap over both frame edges)
-CLAMP_Z0, CLAMP_Z1 = 110.0, FRAME_H
+CLAMP_Z0, CLAMP_Z1 = 48.0, FRAME_H     # starts above the release-bar grip
 CLAMP_WALL = 1.6
 CLAMP_GAP = FRAME_T + 0.1
-SNAP_Z = [125.0, 185.0]           # snap bumps / grooves (frame z)
+SNAP_Z = [70.0, 130.0, 185.0]           # snap bumps / grooves (frame z)
 SNAP_R = 0.6                             # groove radius
 SNAP_H = 0.25                            # how far the bump sticks in (safe flex for PLA/PETG)
 SNAP_YC = -(SNAP_R - SNAP_H - 0.1)       # groove/bump axis, 0.1 mm proud of seated bump
@@ -47,7 +50,8 @@ def row_z(j):
 # ---------------- frame half (print twice, face down) ----------------
 def frame_half():
     plate = cq.Workplane("XY").box(FRAME_W, PLATE_T, FRAME_H, centered=False)
-    win = (cq.Workplane("XY").box(WIN_W, PLATE_T + 2, WIN_H).edges("|Y").fillet(WIN_R))
+    win = (cq.Workplane("XZ").circle(WIN_D / 2).extrude(-(PLATE_T + 2))
+           .translate((0, -1 - PLATE_T / 2, 0)))
     body = plate
     for i in range(COLS):
         for j in range(ROWS):
@@ -61,8 +65,8 @@ def frame_half():
     for i in range(COLS):
         for j in range(ROWS):
             x, z = col_x(i), row_z(j)
-            bs = cq.selectors.BoxSelector((x - WIN_W / 2 - 0.05, PLATE_T - 0.05, z - WIN_H / 2 - 0.05),
-                                          (x + WIN_W / 2 + 0.05, PLATE_T + 0.05, z + WIN_H / 2 + 0.05))
+            bs = cq.selectors.BoxSelector((x - WIN_D / 2 - 0.05, PLATE_T - 0.05, z - WIN_D / 2 - 0.05),
+                                          (x + WIN_D / 2 + 0.05, PLATE_T + 0.05, z + WIN_D / 2 + 0.05))
             sel = bs if sel is None else sel + bs
     body = body.edges(sel).chamfer(0.6)
 
@@ -73,7 +77,7 @@ def frame_half():
     for i in range(COLS - 1):
         x0 = WALL_W + CHAN_W + i * PITCH_X
         rib = (cq.Workplane("XY").box(RIB_W, depth, FRAME_H, centered=False)
-               .edges("|Y and >Z").chamfer(0.9)          # pointed top = disc lead-in
+               .edges("|Y and >Z").chamfer(1.5)          # pointed top = disc lead-in
                .translate((x0, PLATE_T, 0)))
         body = body.union(rib)
     # release-bar slot (open towards the mating face -> no bridging)
@@ -89,6 +93,18 @@ def frame_half():
         hole = (cq.Workplane("XZ").center(xr, z).circle(PEG_HOLE_D / 2).extrude(-(PEG_L + 0.5))
                 .translate((0, HALF_T - PEG_L - 0.5, 0)))
         body = body.cut(hole)
+    # tie pegs on the left three ribs, holes on the right three (halves are identical)
+    for i in range(COLS - 1):
+        xc = WALL_W + CHAN_W + i * PITCH_X + RIB_W / 2
+        for z in TIE_Z:
+            if xc < FRAME_W / 2:
+                p = (cq.Workplane("XZ").center(xc, z).circle(TIE_D / 2).extrude(-TIE_L)
+                     .translate((0, HALF_T, 0)))
+                body = body.union(p.faces(">Y").chamfer(0.3))
+            else:
+                h = (cq.Workplane("XZ").center(xc, z).circle(TIE_HOLE_D / 2).extrude(-(TIE_L + 0.4))
+                     .translate((0, HALF_T - TIE_L - 0.4, 0)))
+                body = body.cut(h)
     # snap grooves on the outer face of both side walls (side clamps click in here)
     for z in SNAP_Z:
         g = (cq.Workplane("YZ").center(0, z).circle(SNAP_R).extrude(FRAME_W + 2)

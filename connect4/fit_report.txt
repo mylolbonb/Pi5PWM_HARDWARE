@@ -1,7 +1,7 @@
 interferences: 0
 min disc-to-frame gap (all 42 discs): 0.750 mm
-disc vs channel: width 3.00 mm total, depth 1.50 mm total
-disc overlaps window edge (retention): 2.50 mm top+bottom
+disc vs channel: width 1.60 mm total, depth 1.50 mm total
+window Ø24.0 vs disc Ø29.0: widest opening is 5.0 mm SMALLER than the disc in every direction -> cannot pass through at any tilt
 bar-to-frame gap: 0.000 mm
 bar pulled-out path vs right foot: 0.000 0.000 mm^3 (0 = clear)
 bar path vs right clamp: 0.000
